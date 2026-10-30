@@ -42,7 +42,7 @@ $SusPath   = '\\Users\\|\\ProgramData\\|\\Temp\\|\\Tmp\\|\\AppData\\|\\Windows\\
 $SusCmd    = '-enc\b|-encodedcommand|frombase64string|downloadstring|downloadfile|invoke-webrequest|\biwr\b|invoke-expression|\biex\b|-w(indowstyle)?\s+hidden|net\.sockets|tcpclient|\bnc(at)?\.exe|\bnc\s+-|mshta|certutil.*-urlcache|bitsadmin.*/transfer'
 $ShellRx   = 'powershell|pwsh|cmd\.exe|cmd /c|wscript|cscript|mshta'
 $AgentRx   = 'datadog|wazuh|ossec|vmtools|vgauth|vm3d|vmware|qemu|cloudbase|balloon|spice|virtio|xen'
-$GoodPath  = '\\ProgramData\\Microsoft\\Windows Defender\\|\\Windows Defender|\\Microsoft\\Edge|\\Microsoft\\EdgeUpdate|\\Microsoft\\EdgeWebView'
+$GoodPath  = '\\ProgramData\\Microsoft\\Windows Defender\\|\\Windows Defender|\\Microsoft\\Edge|\\Microsoft\\EdgeUpdate|\\Microsoft\\EdgeWebView|\\Windows Media Player\\|\\Microsoft Update Health Tools\\|\\Common Files\\microsoft shared\\|\\Internet Explorer\\|\\Windows NT\\Accessories\\'
 $OkProcs   = @('System','Idle','lsass','svchost','services','wininit','spoolsv','dns','dfsrs','ismserv','dfssvc',
                'Microsoft.ActiveDirectory.WebServices','certsrv','vds','WmiPrvSE','wsmprovhost','msdtc')
 $OkPorts   = @(53,88,135,139,389,445,464,593,636,3268,3269,3389,5985,5986,9389,47001)
@@ -274,7 +274,7 @@ function Check-Connections {
         $procId = [int]$c.OwningProcess
         $p = $procs[$procId]; $pn = '?'; $pp = ''
         if ($p) { $pn = $p.ProcessName; $pp = [string]$p.Path }
-        if ($pp -match $AgentRx -or $pn -match $AgentRx) { continue }
+        if ($pp -match $AgentRx -or $pn -match $AgentRx -or $pp -match $GoodPath) { continue }
         $what = "{0} (PID {1}) connected to {2}:{3}" -f $pn, $procId, $c.RemoteAddress, $c.RemotePort
         $blockFix = "Stop-Process -Id $procId -Force   (then block the IP: New-NetFirewallRule -DisplayName 'block $($c.RemoteAddress)' -Direction Outbound -RemoteAddress $($c.RemoteAddress) -Action Block)"
         if ($c.RemoteAddress -match '^10\.\d+\.1\.99$') { $blockFix = "Stop-Process -Id $procId -Force   (do NOT block $($c.RemoteAddress): NetBird egress host, out of scope per packet V2)" }
@@ -315,7 +315,7 @@ function Check-Tasks {
         $state += "$($t.TaskPath)$($t.TaskName)"
         $acts = (@($t.Actions | ForEach-Object { ("{0} {1}" -f $_.Execute, $_.Arguments).Trim() }) -join ' && ')
         $exe  = Get-ExePath (@($t.Actions | ForEach-Object { $_.Execute }) | Select-Object -First 1)
-        if ($acts -match $AgentRx -or $t.TaskName -match $AgentRx) { continue }
+        if ($acts -match $AgentRx -or $t.TaskName -match $AgentRx -or $exe -match $GoodPath) { continue }
         $isMs = $t.TaskPath -like '\Microsoft\*'
         if ($t.TaskPath -eq '\' -and $t.TaskName -match $OkRootTasks) { continue }
         $hardSus = ($exe -match $SusPath) -or ($acts -match $SusCmd)
