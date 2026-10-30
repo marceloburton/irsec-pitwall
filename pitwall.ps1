@@ -13,7 +13,7 @@ Public per IRSeC rule 20.
            shows what's NEW since the last hunt, and prints the fix
            command for each item. Saves a copy to C:\Users\Public\bk.
 
-Never touches: whiteteam, krbtgt, dd-agent, ddagentuser, DataDog, Wazuh.
+Never touches: whiteteam, 10.X.1.99 (NetBird egress), krbtgt, dd-agent, ddagentuser, DataDog, Wazuh.
 Never deletes users. Never runs a virus scan (rule 12).
 
 Run in PowerShell as administrator:
@@ -276,7 +276,9 @@ function Check-Connections {
         if ($p) { $pn = $p.ProcessName; $pp = [string]$p.Path }
         if ($pp -match $AgentRx -or $pn -match $AgentRx) { continue }
         $what = "{0} (PID {1}) connected to {2}:{3}" -f $pn, $procId, $c.RemoteAddress, $c.RemotePort
-        if ($pn -match $bad -or $pp -match $SusPath) { Add-Flag 'FLAG' $what "Stop-Process -Id $procId -Force   (then block the IP: New-NetFirewallRule -DisplayName 'block $($c.RemoteAddress)' -Direction Outbound -RemoteAddress $($c.RemoteAddress) -Action Block)" }
+        $blockFix = "Stop-Process -Id $procId -Force   (then block the IP: New-NetFirewallRule -DisplayName 'block $($c.RemoteAddress)' -Direction Outbound -RemoteAddress $($c.RemoteAddress) -Action Block)"
+        if ($c.RemoteAddress -match '^10\.\d+\.1\.99$') { $blockFix = "Stop-Process -Id $procId -Force   (do NOT block $($c.RemoteAddress): NetBird egress host, out of scope per packet V2)" }
+        if ($pn -match $bad -or $pp -match $SusPath) { Add-Flag 'FLAG' $what $blockFix }
         elseif ($OkProcs -notcontains $pn) { Add-Flag 'CHECK' "$what $pp" "Get-Process -Id $procId | Select Name,Path   (Google the name if unsure)" }
     }
     Ok ("{0} outside connections checked" -f $est.Count)
