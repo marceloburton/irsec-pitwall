@@ -270,8 +270,11 @@ function Check-Connections {
     $bad = '^(powershell|pwsh|cmd|rundll32|regsvr32|mshta|wscript|cscript|nc|ncat|python|python3|java|certutil|bitsadmin)$'
     $est = @(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | Where-Object {
         $_.RemoteAddress -notmatch '^(127\.|::1$|0\.0\.0\.0)' -and $_.RemoteAddress -ne $_.LocalAddress })
+    # skip this script and the PowerShell window that launched it (your own iwr download shows up here)
+    $me = @($PID); try { $me += [int](Get-CimInstance Win32_Process -Filter "ProcessId=$PID" -ErrorAction Stop).ParentProcessId } catch {}
     foreach ($c in $est) {
         $procId = [int]$c.OwningProcess
+        if ($me -contains $procId) { continue }
         $p = $procs[$procId]; $pn = '?'; $pp = ''
         if ($p) { $pn = $p.ProcessName; $pp = [string]$p.Path }
         if ($pp -match $AgentRx -or $pn -match $AgentRx -or $pp -match $GoodPath) { continue }
